@@ -1,0 +1,6 @@
+__pycache__
+.env
+private_keys.json
+fetchtest
+agents.log
+agent1qfzll7xq6t_data.json
