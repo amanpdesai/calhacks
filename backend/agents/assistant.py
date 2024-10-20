@@ -94,6 +94,7 @@ def format_step_name(step):
     Returns:
         str: The formatted step string (e.g., 'Step_1').
     """
+    step += 1
     step = str(step)
     print(step)
     formatted_string = "Step_" + step
