@@ -10,10 +10,6 @@ connection = pymysql.connect(
     port=3306
 )
 
-with connection.cursor() as cursor:
-    sql_query = f'INSERT TABLE...'
-    
-
 # Function to create a chat log table for a specific step with an id column
 def create_chat_log_table(table_name):
     with connection.cursor() as cursor:
