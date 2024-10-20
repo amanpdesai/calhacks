@@ -1,15 +1,191 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modern Dashboard</title>
+    <style>
+        /* Reset some default styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
+        /* Body styling */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #E6E0D4;
+            color: #17191C;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
 
-  <body>
-    <h1>Live streaming</h1>
-    <div>
+        /* Header styling */
+        header {
+            background-color: #17191C;
+            color: #E6E0D4;
+            padding: 20px;
+            text-align: center;
+            font-size: 2em;
+            font-weight: bold;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
 
-        <img src="/video" width="50%"/>
+        /* Main container */
+        .container {
+            flex: 1;
+            display: flex;
+            flex-direction: row;
+            padding: 20px;
+            gap: 20px;
+        }
+
+        /* Webcam section */
+        .webcam-section, .chat-section {
+            background-color: #E6E0D4;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .webcam-section h2, .chat-section h2 {
+            margin-bottom: 15px;
+            color: #17191C;
+            border-bottom: 2px solid #B09A9B;
+            padding-bottom: 5px;
+            width: 100%;
+            text-align: left;
+        }
+
+        /* Video styling */
+        .webcam-section video {
+            width: 80%;
+            height: auto;
+            border-radius: 8px;
+            background-color: #000;
+        }
+
+        /* Chat log styling */
+        .chat-log {
+            flex: 1;
+            width: 100%;
+            overflow-y: auto;
+            background-color: #F5F5F5;
+            padding: 15px;
+            border: 1px solid #B09A9B;
+            border-radius: 8px;
+        }
+
+        /* User chat message */
+        .chat-message.user {
+            margin-bottom: 10px;
+            padding: 10px;
+            background-color: #B09A9B; /* Red-ish color for User */
+            color: #FFFFFF;
+            border-radius: 5px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            align-self: flex-end;
+            max-width: 80%;
+        }
+
+        /* Assistant chat message */
+        .chat-message.assistant {
+            margin-bottom: 10px;
+            padding: 10px;
+            background-color: #FFFFFF; /* Different white for Assistant */
+            color: #17191C;
+            border-radius: 5px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            align-self: flex-start;
+            max-width: 75%;
+        }
+
+        /* Footer styling */
+        footer {
+            background-color: #17191C;
+            color: #E6E0D4;
+            text-align: center;
+            padding: 10px;
+            font-size: 0.9em;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+            }
+
+            .webcam-section video {
+                width: 100%;
+            }
+
+            .chat-message.user, .chat-message.assistant {
+                max-width: 100%;
+            }
+        }
+
+        /* Optional: Button styling for future use */
+        .btn {
+            padding: 10px 20px;
+            background-color: #B09A9B;
+            color: #E6E0D4;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            font-size: 1em;
+            align-self: flex-start;
+        }
+
+        .btn:hover {
+            background-color: #E63232;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header>
+        Dashboard
+    </header>
+
+    <!-- Main Content -->
+    <div class="container">
+        <!-- Webcam Section -->
+        <div class="webcam-section">
+            <h2>Live Webcam Stream</h2>
+            <img src="/video" autoplay muted></img>
+            <!-- Example button for future functionality -->
+            <!-- <button class="btn">Start Recording</button> -->
+        </div>
+
+        <!-- Chat Log Section -->
+        <div class="chat-section">
+            <h2>Chat Log</h2>
+            <div class="chat-log" id="chat-log">
+                <!-- Example chat messages -->
+                <div class="chat-message user">User: Hello!</div>
+                <div class="chat-message assistant">Assistant: Hi there! How can I help you today?</div>
+                <div class="chat-message user">User: I need assistance with a procedure.</div>
+                <div class="chat-message assistant">Assistant: Sure, let's get started.</div>
+                <!-- Chat messages will be dynamically loaded here -->
+            </div>
+            <!-- Example input for future functionality -->
+            <!-- 
+            <input type="text" placeholder="Type a message..." />
+            <button class="btn">Send</button>
+            -->
+        </div>
     </div>
-            
-    </body>
 
-
+    <!-- Footer -->
+    <footer>
+        &copy; 2024 Your Company Name
+    </footer>
+</body>
 </html>
