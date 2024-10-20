@@ -139,10 +139,12 @@ def compare():
     chat_log = update_sql_base(audio_summary, resp)
     if resp.split('. ')[-1] == "Proceed.":
         step_tracker += 1
-    print(chat_log)
+
     try:
         # Send a POST request to the agent's endpoint
-        agent_response = requests.post("http://localhost:8001/description", chat_log)
+        agent_response = requests.post(
+            "http://localhost:8001/rest", {"Judgement": "temp", "User": "temp2"}
+        )
 
         # Check if the agent responded successfully
         if agent_response.status_code == 200:
