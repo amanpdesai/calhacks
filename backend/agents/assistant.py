@@ -4,6 +4,7 @@ from uagents.setup import fund_agent_if_low
 from utils.openai_api import get_openai_response
 import pymysql
 import logging
+from utils.text_to_speech import text_to_wav
 
 logger = logging.getLogger("assistant_agent")
 
@@ -33,8 +34,7 @@ def query_database_validation(step):
         result = cursor.fetchall()
         return result
 
-
-print(query_database_validation("Step_1"))
+# print(query_database_validation("Step_1"))
 
 
 def parse_instructions(instruction_text):
@@ -119,6 +119,8 @@ async def handle_user_message(ctx: Context, sender: str, msg: ContextPrompt):
                 "agent1qwusk4z83wtga2wl9l4r8kls5j2hmvz8uyzfvz6xkuldz383mfvrwenc98k",
                 Response(text=assistant_response),
             )
+            text_to_wav(assistant_response, "./temp_storage/")
+            # insert_chat_log(table_name, "Chat", assistant_response, idx)
             logger.info(f"Sent initial step to user: Step {current_step}")
         else:
             print("instructions done")
@@ -145,6 +147,7 @@ async def handle_user_message(ctx: Context, sender: str, msg: ContextPrompt):
                 prompt_context="",  # ctx.storage.get("context"),
                 prompt_text=prompt_text,
             )
+
             print("assistant response", assistant_response.strip().lower())
             # Check the assistant's response
             if assistant_response.strip().lower() == "done":
@@ -157,6 +160,10 @@ async def handle_user_message(ctx: Context, sender: str, msg: ContextPrompt):
                         Response(
                             text="The procedure is complete. If you have any questions, feel free to ask."
                         ),
+                    )
+                    text_to_wav(
+                        "The procedure is complete. If you have any questions, feel free to ask.",
+                        "./temp_storage/",
                     )
                     ctx.storage.set("procedure_complete", True)
                     logger.info("Procedure completed.")
@@ -174,10 +181,12 @@ async def handle_user_message(ctx: Context, sender: str, msg: ContextPrompt):
                         prompt_text=prompt_text,
                     )
                     await ctx.send(sender, Response(text=assistant_response))
+                    text_to_wav(assistant_response, "./temp_storage/")
                     logger.info(f"Moved to next step: Step {current_step}")
             else:
                 # Send the assistant's response to the user
-                await ctx.send(sender, Response(text=assistant_response))
+                # await ctx.send(sender, Response(text=assistant_response))
+                text_to_wav(assistant_response, "./temp_storage/")
                 logger.info(f"Sent guidance to user on Step {current_step}")
     except Exception as e:
         logger.error(f"Error in assistant agent: {e}")
