@@ -1,10 +1,10 @@
 from flask import Flask, jsonify, request, render_template, Response, send_file
 import cv2
-import numpy as np
 import io
 import pymysql
 from image_description import generate_full_summary, checkai_instr_vs_summaries, serber
 import requests
+from servmodels.models import Response
 
 connection = pymysql.connect(
     host='svc-f90325a9-8b27-495d-a436-7cb5c7764c62-dml.aws-oregon-3.svc.singlestore.com',
@@ -62,25 +62,14 @@ def generate_frames():
 def test():
     return jsonify("Hola Mundo")
 
-@app.route("/post-agent-chat-resp", methods=['POST'])
-def post_angent_chat_resp():
-    try:
-        # force=True to parse even if 'Content-Type' is incorrect
-        data = request.get_json(force=True)
-    except Exception as e:
-        print(f"Error parsing JSON: {e}")
-        return {'status': 'error', 'message': 'Invalid JSON'}, 400
+@app.route("/generated", methods=["GET"])
+def generated():
+    data = request.args
 
-    if not data or 'transcript' not in data:
-        print("No 'transcript' field in the request.")
-        return {'status': 'error', 'message': 'No transcript provided'}, 400
+    response = {"received_data": data.to_dict()}
+    print(response)
+    return jsonify(response)
 
-    chat_text = data['text']
-    chat_step = data['step']
-    print(f"Step: {chat_step}")
-    print(f"Text: {chat_text}")
-
-    return jsonify({'step': chat_step, 'text': chat_text, 'status': 'success'}), 200
 
 @app.route("/descriptions")
 def upload_file():
@@ -150,7 +139,22 @@ def compare():
     chat_log = update_sql_base(audio_summary, resp)
     if resp.split('. ')[-1] == "Proceed.":
         step_tracker += 1
-    return chat_log
+    print(chat_log)
+    try:
+        # Send a POST request to the agent's endpoint
+        agent_response = requests.post("http://localhost:8001/description", chat_log)
+
+        # Check if the agent responded successfully
+        if agent_response.status_code == 200:
+            print("Successfully forwarded data to the agent.")
+            return jsonify({"data": chat_log, "status": "success"}), 200
+        else:
+            print(f"Agent response error: {agent_response.status_code}")
+            return {"status": "error", "message": "Agent processing failed"}, 500
+    except Exception as e:
+        print(f"Error forwarding data to the agent: {e}")
+        return {"status": "error", "message": "Failed to forward to agent"}, 500
+
 
 def push_latest_transcript_to_sql():
     try:
@@ -192,7 +196,7 @@ def update_sql_base(user, chat):
 
             connection.commit()
 
-            return f"Judgement: {chat}   \nUser: {user}"
+            return {"Judgement": chat, "User": user}
 
     except pymysql.MySQLError as e:
         print(f"Error: {e}")

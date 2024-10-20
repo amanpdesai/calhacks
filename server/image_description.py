@@ -1,11 +1,12 @@
 import os
 from openai import OpenAI
-from PIL import Image
 import requests
 import base64
+from dotenv import load_dotenv
 
+load_dotenv()
 # Set your API key
-key = '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'
+key = os.getenv("OPENAI_API_KEY")
 client = OpenAI(
     api_key=key
 )
@@ -62,7 +63,7 @@ def generate_full_summary():
     try:
         img_name = 'pfp.png'
         # Download image from serber
-        os.chdir(os.getcwd() + '/server/images')
+        os.chdir(os.getcwd() + "server/images")
         download_frame(img_name)
         os.chdir('..')
         os.chdir('..')
