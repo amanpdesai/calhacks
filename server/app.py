@@ -142,9 +142,7 @@ def compare():
 
     try:
         # Send a POST request to the agent's endpoint
-        agent_response = requests.post(
-            "http://localhost:8001/rest", {"Judgement": "temp", "User": "temp2"}
-        )
+        agent_response = requests.post("http://localhost:8001/rest", json=chat_log)
 
         # Check if the agent responded successfully
         if agent_response.status_code == 200:

@@ -1,5 +1,5 @@
 from uagents import Agent, Context
-from models.models import ContextPrompt, Response, Request, ResponseA
+from models.models import ContextPrompt, Request, ResponseA
 from uagents.setup import fund_agent_if_low
 from utils.openai_api import get_openai_response
 import pymysql
@@ -45,6 +45,22 @@ def insert_chat_log(table_name, speaker, message, idx):
     with connection.cursor() as cursor:
         cursor.execute(f"INSERT INTO `{table_name}` (ID, Speaker, Message) VALUES (%s, %s, %s)", (idx, speaker, message))
         connection.commit()
+
+def send_post_request(data):
+    try:
+        # Send a POST request with JSON data
+        response = requests.post(flask_endpoint, json=data)
+
+        # Check if the request was successful
+        if response.status_code == 200:
+            print("POST request was successful!")
+            print("Response:", response.json())
+        else:
+            print(f"POST request failed with status code: {response.status_code}")
+            print("Response:", response.text)
+    except Exception as e:
+        print(f"An error occurred: {e}")
+
 
 def query_database_validation(step):
     """
@@ -161,10 +177,11 @@ async def handle_user_message(ctx: Context, sender: str, msg: ContextPrompt):
             )
 
             # # Send the response to the user
-            # await ctx.send(
-            #     "agent1qwusk4z83wtga2wl9l4r8kls5j2hmvz8uyzfvz6xkuldz383mfvrwenc98k",
-            #     Response(text=assistant_response),
-            # )
+            payload = {
+                "current_step": ctx.storage.get("current_step"),
+                "message": assistant_response,
+            }
+            send_post_request(payload)
             text_to_wav(assistant_response, "./temp_storage/")
             # insert_chat_log(table_name, "Chat", assistant_response, idx)
             idx = get_last_index(current_step)
@@ -185,18 +202,23 @@ async def handle_user_message(ctx: Context, sender: str, msg: ContextPrompt):
                 response_message = (
                     f"Received your message for Step {chat_step}: {chat_text}"
                 )
-                # await ctx.send(sender, Response(text=response_message))
-                # sent -> flask server
+                payload = {
+                    "current_step": ctx.storage.get("current_step"),
+                    "message": response_message,
+                }
+                send_post_request(payload)
                 ctx.storage.set("send", response_message)
                 # request
+
                 logger.info(f"Sent response to {sender}")
 
             except Exception as e:
                 logger.error(f"Error processing request: {e}")
-                # await ctx.send(
-                #     sender,
-                #     Response(text="An error occurred while processing your request."),
-                # )
+                payload = {
+                    "current_step": ctx.storage.get("current_step"),
+                    "message": response_message,
+                }
+                send_post_request(payload)
 
             # Instructions are already parsed; handle user message
             current_step = ctx.storage.get("current_step")
@@ -241,8 +263,11 @@ async def handle_user_message(ctx: Context, sender: str, msg: ContextPrompt):
                         corrective_response = "I'm unable to assist with this step at the moment. Please try again later."
 
                     # Send the corrective response to the user
-                    # await ctx.send(sender, Response(text=corrective_response))
-
+                    payload = {
+                        "current_step": ctx.storage.get("current_step"),
+                        "message": corrective_response,
+                    }
+                    send_post_request(payload)
                     # Convert text to speech and save
                     text_to_wav(corrective_response, "./temp_storage/")
 
@@ -271,12 +296,11 @@ async def handle_user_message(ctx: Context, sender: str, msg: ContextPrompt):
                 # User confirmed completion; move to the next step
                 current_step = increment_step(ctx)
                 if current_step >= len(instruction_list):
-                    # await ctx.send(
-                    #     sender,
-                    #     Response(
-                    #         text="The procedure is complete. If you have any questions, feel free to ask."
-                    #     ),
-                    # )
+                    payload = {
+                        "current_step": ctx.storage.get("current_step"),
+                        "message": "The procedure is complete. If you have any questions, feel free to ask.",
+                    }
+                    send_post_request(payload)
                     text_to_wav(
                         "The procedure is complete. If you have any questions, feel free to ask.",
                         "./temp_storage/",
@@ -287,7 +311,6 @@ async def handle_user_message(ctx: Context, sender: str, msg: ContextPrompt):
                     ctx.storage.set("procedure_complete", True)
                     logger.info("Procedure completed.")
                 else:
-                    # Send the next step without the 'done' feature
                     step_instruction = instruction_list[current_step]
                     print("current step without done feature: ", current_step)
                     prompt_text = (
@@ -299,22 +322,24 @@ async def handle_user_message(ctx: Context, sender: str, msg: ContextPrompt):
                         prompt_context=ctx.storage.get("context"),
                         prompt_text=prompt_text,
                     )
-                    # await ctx.send(sender, Response(text=assistant_response))
+                    payload = {
+                        "current_step": ctx.storage.get("current_step"),
+                        "message": assistant_response,
+                    }
+                    send_post_request(payload)
                     text_to_wav(assistant_response, "./temp_storage/")
                     idx = get_last_index(current_step)
                     insert_chat_log(f'Step_{current_step}', "Chat", assistant_response, idx + 1)
                     logger.info(f"Moved to next step: Step {current_step}")
             else:
+                payload = {
+                    "current_step": ctx.storage.get("current_step"),
+                    "message": assistant_response,
+                }
+                send_post_request(payload)
                 text_to_wav(assistant_response, "./temp_storage/")
-                # await ctx.send(sender, Response(text=assistant_response))
                 idx = get_last_index(current_step)
                 insert_chat_log(f'Step_{current_step}', "Chat", assistant_response, idx + 1)
                 logger.info(f"Sent guidance to user on Step {current_step}")
     except Exception as e:
         logger.error(f"Error in assistant agent: {e}")
-        # await ctx.send(
-        #     sender,
-        #     Response(
-        #         text="An error occurred while processing your request. Please try again later."
-        #     ),
-        # )
