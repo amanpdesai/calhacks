@@ -62,6 +62,26 @@ def generate_frames():
 def test():
     return jsonify("Hola Mundo")
 
+@app.route("/post-agent-chat-resp", methods=['POST'])
+def post_angent_chat_resp():
+    try:
+        # force=True to parse even if 'Content-Type' is incorrect
+        data = request.get_json(force=True)
+    except Exception as e:
+        print(f"Error parsing JSON: {e}")
+        return {'status': 'error', 'message': 'Invalid JSON'}, 400
+
+    if not data or 'transcript' not in data:
+        print("No 'transcript' field in the request.")
+        return {'status': 'error', 'message': 'No transcript provided'}, 400
+
+    chat_text = data['text']
+    chat_step = data['step']
+    print(f"Step: {chat_step}")
+    print(f"Text: {chat_text}")
+
+    return jsonify({'step': chat_step, 'text': chat_text, 'status': 'success'}), 200
+
 @app.route("/descriptions")
 def upload_file():
     if 'file' not in request.files:
