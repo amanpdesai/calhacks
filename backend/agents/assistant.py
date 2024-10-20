@@ -5,6 +5,7 @@ from utils.openai_api import get_openai_response
 import pymysql
 import logging
 from utils.text_to_speech import text_to_wav
+import re
 
 logger = logging.getLogger("assistant_agent")
 
@@ -39,12 +40,19 @@ def insert_chat_log(table_name, speaker, message, idx):
         connection.commit()
 
 def query_database_validation(step):
-    with connection.cursor() as cursor:
-        sql_query = f"SELECT * FROM {step} as s WHERE s.Speaker = 'Judgement'"
-        cursor.execute(sql_query)
-        result = cursor.fetchall()
-        return result
-# print(query_database_validation("Step_1"))
+    """
+    Function to query the database for validation of the current step.
+    Returns a list of tuples containing (step_number, Speaker, Judgement).
+    """
+    try:
+        with connection.cursor() as cursor:
+            sql_query = f"SELECT * FROM Step_{step} AS s WHERE s.Speaker = 'Judgement'"
+            cursor.execute(sql_query)
+            result = cursor.fetchall()
+            return result
+    except Exception as e:
+        logger.error(f"Database query failed for Step_{step}: {e}")
+        return []
 
 
 def parse_instructions(instruction_text):
@@ -53,25 +61,16 @@ def parse_instructions(instruction_text):
     Each element in the list is a non-empty line from the instructions.
     """
     try:
-        # Ensure instruction_text is a string and not None
         if instruction_text is None:
             raise ValueError("instruction_text cannot be None")
 
         # Split the instruction_text into lines and strip whitespace
         lines = instruction_text.strip().split("\n")
-
-        # Filter out empty lines after stripping
         instruction_list = [line.strip() for line in lines if line.strip()]
-
-        # Print the list for verification
-        print("Parsed Instruction List:")
-        for idx, line in enumerate(instruction_list):
-            print(f"{idx}: {line}")
 
         return instruction_list
 
     except Exception as e:
-        # Handle and print any exception that occurs
         print(f"An error occurred: {e}")
         return None
 
@@ -84,6 +83,22 @@ def increment_step(ctx):
     current_step += 1
     ctx.storage.set("current_step", current_step)
     return current_step
+
+def format_step_name(step):
+    """
+    Converts a step string from 'Step X' to 'Step_X' using regular expressions.
+
+    Parameters:
+        step_string (str): The original step string (e.g., 'Step 1').
+
+    Returns:
+        str: The formatted step string (e.g., 'Step_1').
+    """
+    step = str(step)
+    print(step)
+    formatted_string = "Step_" + step
+    print(formatted_string)
+    return formatted_string
 
 
 @assistant_agent.on_event("startup")
@@ -100,15 +115,16 @@ async def handle_user_message(ctx: Context, sender: str, msg: ContextPrompt):
         # Check if the instructions have been parsed and stored
         if not ctx.storage.get("instructions_parsed"):
             # Parse the catheter_instruction and store it
+            print("test")
             catheter_instruction = (
                 msg.text
             )  # Assuming msg.text contains the instructions
+            print("test2")
             instruction_list = parse_instructions(catheter_instruction)
             ctx.storage.set("instruction_list", instruction_list)
             ctx.storage.set("instructions_parsed", True)
             ctx.storage.set("current_step", 0)  # Start at step 0
             ctx.storage.set("procedure_complete", False)
-            print("instructions parsed", ctx.storage.get("instructions_parsed"))
             ctx.storage.set("context", msg.context)
             # Initialize conversation by sending the first step
             current_step = ctx.storage.get("current_step")
@@ -133,7 +149,6 @@ async def handle_user_message(ctx: Context, sender: str, msg: ContextPrompt):
             # insert_chat_log(table_name, "Chat", assistant_response, idx)
             idx = get_last_index(current_step)
             insert_chat_log(f'Step_{current_step}', "Chat", assistant_response, idx + 1)
-
             logger.info(f"Sent initial step to user: Step {current_step}")
         else:
             print("instructions done")
@@ -144,6 +159,52 @@ async def handle_user_message(ctx: Context, sender: str, msg: ContextPrompt):
             logger.info(f"Current step: {current_step}")
             # Confirm and print the user's message
             logger.info(f"Received message from user: {msg.text}")
+            table_name = format_step_name(current_step)
+            # Perform database validation
+            validation_results = query_database_validation(table_name)
+            logger.info(f"Validation Results: {validation_results}")
+
+            # Check if any of the judgments say 'Do Not Proceed.'
+            do_not_proceed = False
+            incorrect_description = ""
+            for record in validation_results:
+                step_number, speaker, judgement = record
+                test = judgement.lower().split(".")[1]
+                print(test)
+                if "do not proceed" in test:
+                    do_not_proceed = True
+                    incorrect_description = judgement
+                    break  # one 'Do Not Proceed.' is enough
+
+            if do_not_proceed:
+                step_instruction = instruction_list[current_step]
+
+                # Craft a prompt to guide the user
+                prompt_text = (
+                    f"The user is making a mistake in the current step.\n\n"
+                    f"Here is the instruction for Step {current_step}: {step_instruction}\n"
+                    f"Here is what they are actually doing: {incorrect_description}\n\n"
+                    f"Please guide them to correct their action based on the instruction."
+                )
+
+                # Get the assistant's corrective response
+                corrective_response = await get_openai_response(
+                    prompt_context=ctx.storage.get("context", ""),
+                    prompt_text=prompt_text,
+                )
+
+                # Check if OpenAI returned a valid response
+                if not corrective_response:
+                    corrective_response = "I'm unable to assist with this step at the moment. Please try again later."
+
+                # Send the corrective response to the user
+                await ctx.send(sender, Response(text=corrective_response))
+
+                # Convert text to speech and save
+                text_to_wav(corrective_response, "./temp_storage/")
+
+                logger.info(f"Provided corrective guidance for Step {current_step}")
+
             # Prepare the prompt
             step_instruction = instruction_list[current_step]
             user_input = msg.text
