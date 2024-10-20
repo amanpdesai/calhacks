@@ -2,39 +2,75 @@ from uagents import Agent, Context
 from models.models import ContextPrompt, Response
 from uagents.setup import fund_agent_if_low
 from utils.openai_api import get_openai_response
-from utils.config import setup_logging
+import pymysql
+import logging
 
-logger = setup_logging()
+logger = logging.getLogger("assistant_agent")
 
 assistant_agent = Agent(
     name="assistant_agent",
-    seed="assistant_seed_unique",  # Ensure this seed is unique
+    seed="assistant_seed_unique",
     port=8001,
     endpoint="http://localhost:8001/submit",
+)
+
+# Connect to the SingleStore database
+connection = pymysql.connect(
+    host="svc-f90325a9-8b27-495d-a436-7cb5c7764c62-dml.aws-oregon-3.svc.singlestore.com",
+    user="admin",
+    password="Flj3M3k6N1of0CXLuR73YiPRMkf9JiTj",
+    database="instructions",
+    port=3306,
 )
 
 fund_agent_if_low(assistant_agent.wallet.address())
 
 
+def query_database_validation(step):
+    with connection.cursor() as cursor:
+        sql_query = f"SELECT * FROM {step} as s WHERE s.Speaker = 'Judgement'"
+        cursor.execute(sql_query)
+        result = cursor.fetchall()
+        return result
+
+
+print(query_database_validation("Step_1"))
+
+
 def parse_instructions(instruction_text):
     """
     Function to parse the catheter_instruction and turn it into a list.
-    Each element in the list is a line from the instructions, including empty lines.
+    Each element in the list is a non-empty line from the instructions.
     """
-    lines = instruction_text.strip().split("\n")
-    instruction_list = [line.strip() for line in lines]
-    # Print the list for verification
-    print("Parsed Instruction List:")
-    for idx, line in enumerate(instruction_list):
-        print(f"{idx}: {line}")
-    return instruction_list
+    try:
+        # Ensure instruction_text is a string and not None
+        if instruction_text is None:
+            raise ValueError("instruction_text cannot be None")
+
+        # Split the instruction_text into lines and strip whitespace
+        lines = instruction_text.strip().split("\n")
+
+        # Filter out empty lines after stripping
+        instruction_list = [line.strip() for line in lines if line.strip()]
+
+        # Print the list for verification
+        print("Parsed Instruction List:")
+        for idx, line in enumerate(instruction_list):
+            print(f"{idx}: {line}")
+
+        return instruction_list
+
+    except Exception as e:
+        # Handle and print any exception that occurs
+        print(f"An error occurred: {e}")
+        return None
 
 
 def increment_step(ctx):
     """
     Function to move to the next step and update the current step in the context storage.
     """
-    current_step = ctx.storage.get("current_step", 0)
+    current_step = ctx.storage.get("current_step")
     current_step += 1
     ctx.storage.set("current_step", current_step)
     return current_step
@@ -62,6 +98,7 @@ async def handle_user_message(ctx: Context, sender: str, msg: ContextPrompt):
             ctx.storage.set("instructions_parsed", True)
             ctx.storage.set("current_step", 0)  # Start at step 0
             ctx.storage.set("procedure_complete", False)
+            print("instructions parsed", ctx.storage.get("instructions_parsed"))
             ctx.storage.set("context", msg.context)
             # Initialize conversation by sending the first step
             current_step = ctx.storage.get("current_step")
@@ -78,11 +115,15 @@ async def handle_user_message(ctx: Context, sender: str, msg: ContextPrompt):
                 prompt_text=prompt_text,
             )
             # Send the response to the user
-            await ctx.send(sender, Response(text=assistant_response))
+            await ctx.send(
+                "agent1qwusk4z83wtga2wl9l4r8kls5j2hmvz8uyzfvz6xkuldz383mfvrwenc98k",
+                Response(text=assistant_response),
+            )
             logger.info(f"Sent initial step to user: Step {current_step}")
         else:
+            print("instructions done")
             # Instructions are already parsed; handle user message
-            current_step = ctx.storage.get("current_step", 0)
+            current_step = ctx.storage.get("current_step")
             instruction_list = ctx.storage.get("instruction_list")
             # Log the current step
             logger.info(f"Current step: {current_step}")
@@ -93,17 +134,18 @@ async def handle_user_message(ctx: Context, sender: str, msg: ContextPrompt):
             user_input = msg.text
             prompt_text = (
                 f"You are currently assisting a first responder by guiding them through a catheter thoracostomy. "
+                f"If the user's message indicates they are finished and ready for the next step, reply with specifically and exactly the single word 'DONE' and nothing else."
                 f"Of the steps you previously saw, you are currently on this step: {step_instruction}. "
                 f"The user just said the following: {user_input}. "
                 f"Please respond accordingly so that they can complete this step and move on. "
-                f"If the user provides any confirmation that they are done with the step, ONLY generate a reply to this message saying the word 'done'. "
-                f"Otherwise, draft out a response to guide them through the current step."
+                f"If their message does not indicate completion or readiness to proceed, provide further instructions or guidance for the current step."
             )
             # Get the assistant's response
             assistant_response = await get_openai_response(
-                prompt_context=ctx.storage.get("context"),
+                prompt_context="",  # ctx.storage.get("context"),
                 prompt_text=prompt_text,
             )
+            print("assistant response", assistant_response.strip().lower())
             # Check the assistant's response
             if assistant_response.strip().lower() == "done":
                 # User confirmed completion; move to the next step
@@ -121,6 +163,7 @@ async def handle_user_message(ctx: Context, sender: str, msg: ContextPrompt):
                 else:
                     # Send the next step without the 'done' feature
                     step_instruction = instruction_list[current_step]
+                    print("current step without done feature: ", current_step)
                     prompt_text = (
                         f"You are currently assisting a first responder by guiding them through a catheter thoracostomy. "
                         f"Of the steps you previously saw, you are currently on this step: {step_instruction}. "
