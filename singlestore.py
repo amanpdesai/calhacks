@@ -10,6 +10,10 @@ connection = pymysql.connect(
     port=3306
 )
 
+with connection.cursor() as cursor:
+    sql_query = f'INSERT TABLE...'
+    
+
 # Function to create a chat log table for a specific step with an id column
 def create_chat_log_table(table_name):
     with connection.cursor() as cursor:
@@ -90,6 +94,13 @@ steps = [
     "Step 36: Utilize tips and tricks to improve the procedure. Conscious sedation: Can be used for patient comfort in selected cases; Marking the insertion point: Do this before skin preparation to avoid losing landmarks; Patient communication: Keep the patient informed to reduce anxiety and improve cooperation.",
     "Step 37: Be aware of potential complications. Malpositioning of the tube: Into the lung parenchyma, lobar fissure, under the diaphragm, or subcutaneously; Blockage of the tube: Due to blood clots, debris, or kinking; Dislodgement of the tube: May require replacement; Re-expansion pulmonary edema; Subcutaneous emphysema; Infection of residual pleural fluid or recurrent effusion; Pulmonary or diaphragmatic laceration; Intercostal neuralgia: Due to injury of the neurovascular bundle below a rib; Bleeding; Rarely, perforation of other structures in the chest or abdomen. Hazard: Awareness of these complications is essential for prompt recognition and management."
 ]
+
+running_table_name = 'Transcript'
+with connection.cursor() as cursor:
+    create_table_query = f"CREATE TABLE IF NOT EXISTS `{running_table_name}` (step INT, text TEXT);"
+    cursor.execute(create_table_query)
+    print("Transcript Created")
+    connection.commit()
 
 # Create a table for each step and create a single row for the translated instruction
 step_counter = 1

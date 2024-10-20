@@ -1,74 +1,63 @@
-from flask import Flask, jsonify, request, render_template, Response, send_file
-import cv2
-import numpy as np
-import io
+from flask import Flask, jsonify, request, render_template_string
+from flask_socketio import SocketIO, emit
+import eventlet
 
 app = Flask(__name__)
-camera = cv2.VideoCapture(0)
+app.config['SECRET_KEY'] = 'your_secret_key'  
+socketio = SocketIO(app, cors_allowed_origins="*")
 
-latest_frame = None
+# Variable to store the latest transcript
+latest_transcript = ""
 
-def generate_frames():
-    global latest_frame
-    while True:
-            
-        ## read the camera frame
-        success,frame=camera.read()
-        if not success:
-            break
-        else:
-            latest_frame = frame.copy()
-            ret,buffer=cv2.imencode('.jpg',frame)
-            frame=buffer.tobytes()
+# HTML template with SocketIO client
+HTML_TEMPLATE = """
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Live Transcript</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.4.1/socket.io.min.js"
+            integrity="sha512-YqQ6oV6lFkjNz9BR6vSUIeMKv+jh6ePu4joaZK8+GaqV3FTgIo+UuhD6rwO6O6aTmghJxDg5nzB5d0CN8rQQVQ=="
+            crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+</head>
+<body>
+    <h1>Live Transcript</h1>
+    <p id="transcript">{{ transcript }}</p>
 
-        yield(b'--frame\r\n'
-                   b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+    <script type="text/javascript">
+        var socket = io();
 
-@app.route("/")
-def test():
-    return jsonify("Hola Mundo")
+        socket.on('new_transcript', function(data) {
+            document.getElementById('transcript').innerText = data.transcript;
+        });
+    </script>
+</body>
+</html>
+"""
 
-@app.route("/descriptions")
-def upload_file():
-    if 'file' not in request.files:
-        return 'No file part'
 
-    file = request.files['file']
+@app.route('/')
+def index():
+    return render_template_string(HTML_TEMPLATE, transcript=latest_transcript)
 
-    if file.filename == '':
-        return 'No selected file'
+@app.route('/transcript', methods=['POST'])
+def receive_transcript():
+    global latest_transcript
+    try:
+        # force=True to parse even if 'Content-Type' is incorrect
+        data = request.get_json(force=True)
+    except Exception as e:
+        print(f"Error parsing JSON: {e}")
+        return {'status': 'error', 'message': 'Invalid JSON'}, 400
 
-    if file:
-        file.save('uploads/' + file.filename)
-        return 'File uploaded successfully'
+    if not data or 'transcript' not in data:
+        print("No 'transcript' field in the request.")
+        return {'status': 'error', 'message': 'No transcript provided'}, 400
 
-@app.route('/stream')
-def stream():
-    return render_template("./index.html")
+    latest_transcript = data['transcript']
+    print(f"Received transcript: {latest_transcript}")  # Server-side logging
 
-@app.route('/video')
-def video():
-    return Response(generate_frames(),mimetype='multipart/x-mixed-replace; boundary=frame')
+    return jsonify({'status': 'success'}), 200
 
-@app.route('/grab-frame')
-def grab_frame():
-    global latest_frame
-    if latest_frame is None:
-        return "No frame available", 404
 
-    # Encode the latest frame as a JPEG image
-    ret, jpeg = cv2.imencode('.jpg', latest_frame)
-    if not ret:
-        return "Failed to encode frame", 500
-
-    # Convert the JPEG image to bytes
-    image_bytes = jpeg.tobytes()
-    # Create an in-memory bytes buffer
-    buffer = io.BytesIO(image_bytes)
-
-    # Send the image as a downloadable file
-    buffer.seek(0)
-    return send_file(buffer, mimetype='image/jpeg', as_attachment=True, download_name='frame.jpg')
-
-if __name__ == "__main__":
-    app.run()
+if __name__ == '__main__':
+    socketio.run(app, host='0.0.0.0', port=5001, debug=True)
