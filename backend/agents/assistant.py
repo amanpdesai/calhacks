@@ -27,6 +27,17 @@ connection = pymysql.connect(
 
 fund_agent_if_low(assistant_agent.wallet.address())
 
+def get_last_index(step_tracker):
+    with connection.cursor() as cursor:
+        search_query = f"SELECT MAX(id) AS highest_index FROM Step_{step_tracker}"
+        cursor.execute(search_query)
+        results = cursor.fetchall()
+        return results[0][0]
+    
+def insert_chat_log(table_name, speaker, message, idx):
+    with connection.cursor() as cursor:
+        cursor.execute(f"INSERT INTO `{table_name}` (ID, Speaker, Message) VALUES (%s, %s, %s)", (idx, speaker, message))
+        connection.commit()
 
 def query_database_validation(step):
     """
@@ -42,8 +53,6 @@ def query_database_validation(step):
     except Exception as e:
         logger.error(f"Database query failed for Step_{step}: {e}")
         return []
-
-# print(query_database_validation("Step_1"))
 
 
 def parse_instructions(instruction_text):
@@ -137,6 +146,9 @@ async def handle_user_message(ctx: Context, sender: str, msg: ContextPrompt):
                 Response(text=assistant_response),
             )
             text_to_wav(assistant_response, "./temp_storage/")
+            # insert_chat_log(table_name, "Chat", assistant_response, idx)
+            idx = get_last_index(current_step)
+            insert_chat_log(f'Step_{current_step}', "Chat", assistant_response, idx + 1)
             logger.info(f"Sent initial step to user: Step {current_step}")
         else:
             print("instructions done")
@@ -227,6 +239,9 @@ async def handle_user_message(ctx: Context, sender: str, msg: ContextPrompt):
                         "The procedure is complete. If you have any questions, feel free to ask.",
                         "./temp_storage/",
                     )
+                    idx = get_last_index(current_step)                        
+                    insert_chat_log(f'Step_{current_step}', "Chat", assistant_response, idx + 1)
+
                     ctx.storage.set("procedure_complete", True)
                     logger.info("Procedure completed.")
                 else:
@@ -244,11 +259,15 @@ async def handle_user_message(ctx: Context, sender: str, msg: ContextPrompt):
                     )
                     await ctx.send(sender, Response(text=assistant_response))
                     text_to_wav(assistant_response, "./temp_storage/")
+                    idx = get_last_index(current_step)
+                    insert_chat_log(f'Step_{current_step}', "Chat", assistant_response, idx + 1)
                     logger.info(f"Moved to next step: Step {current_step}")
             else:
                 # Send the assistant's response to the user
                 # await ctx.send(sender, Response(text=assistant_response))
                 text_to_wav(assistant_response, "./temp_storage/")
+                idx = get_last_index(current_step)
+                insert_chat_log(f'Step_{current_step}', "Chat", assistant_response, idx + 1)
                 logger.info(f"Sent guidance to user on Step {current_step}")
     except Exception as e:
         logger.error(f"Error in assistant agent: {e}")
