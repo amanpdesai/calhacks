@@ -12,7 +12,8 @@ class Message(Model):
     text: str
 
 class Request(Model):
-    text: str
+    Judgement: str
+    User: str
 
 
 class ResponseA(Model):

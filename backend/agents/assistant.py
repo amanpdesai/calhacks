@@ -108,15 +108,25 @@ def format_step_name(step):
     print(formatted_string)
     return formatted_string
 
-@assistant_agent.on_rest_get("/rest", ResponseA)
-async def handle_get(ctx: Context) -> Dict[str, Any]:
-    ctx.logger.info("Received GET request")
-    return {
-        "timestamp": int(time.time()),
-        "text": "Hello from the GET handler!",
-        "agent_address": ctx.agent.address,
-    }
+# @assistant_agent.on_rest_get("/rest", ResponseA)
+# async def handle_get(ctx: Context) -> Dict[str, Any]:
+#     ctx.logger.info("Received GET request")
+#     ctx.body
+#     return {
+#         "timestamp": int(time.time()),
+#         "text": "Hello from the GET handler!",
+#         "agent_address": ctx.agent.address,
+#     }
 
+@assistant_agent.on_rest_post("/rest", Request, Response)
+async def handle_post(ctx: Context, req: Request) -> Response:
+    ctx.logger.info("Received POST request")
+    print(req.text)
+    return Response(
+        text=f"Received: {req.text}",
+        agent_address=ctx.agent.address,
+        timestamp=int(time.time()),
+    )
 
 # @assistant_agent.on_rest_post("/custom_post_route", Request, Response)
 # async def handle_post(ctx: Context, req: Request) -> Response:
