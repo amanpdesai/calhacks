@@ -108,30 +108,17 @@ def format_step_name(step):
     print(formatted_string)
     return formatted_string
 
-# @assistant_agent.on_rest_get("/rest", ResponseA)
-# async def handle_get(ctx: Context) -> Dict[str, Any]:
-#     ctx.logger.info("Received GET request")
-#     ctx.body
-#     return {
-#         "timestamp": int(time.time()),
-#         "text": "Hello from the GET handler!",
-#         "agent_address": ctx.agent.address,
-#     }
 
-@assistant_agent.on_rest_post("/rest", Request, Response)
-async def handle_post(ctx: Context, req: Request) -> Response:
+@assistant_agent.on_rest_post("/rest", Request, ResponseA)
+async def handle_post(ctx: Context, req: Request) -> ResponseA:
     ctx.logger.info("Received POST request")
-    print(req.text)
-    return Response(
-        text=f"Received: {req.text}",
-        agent_address=ctx.agent.address,
-        timestamp=int(time.time()),
+    print(req.Judgement, req.User)
+    ctx.storage.set("request_judgement", req.Judgement)
+    ctx.storage.set("request_user", req.User)
+    return ResponseA(
+        Input=f"Received: {req.Judgement, req.User}",
     )
 
-# @assistant_agent.on_rest_post("/custom_post_route", Request, Response)
-# async def handle_post(ctx: Context, req: Request) -> Response:
-#     ctx.logger.info(req)  # access to the request
-#     return Response(...)
 
 @assistant_agent.on_event("startup")
 async def start_conversation(ctx: Context):
@@ -173,11 +160,11 @@ async def handle_user_message(ctx: Context, sender: str, msg: ContextPrompt):
                 prompt_text=prompt_text,
             )
 
-            # Send the response to the user
-            await ctx.send(
-                "agent1qwusk4z83wtga2wl9l4r8kls5j2hmvz8uyzfvz6xkuldz383mfvrwenc98k",
-                Response(text=assistant_response),
-            )
+            # # Send the response to the user
+            # await ctx.send(
+            #     "agent1qwusk4z83wtga2wl9l4r8kls5j2hmvz8uyzfvz6xkuldz383mfvrwenc98k",
+            #     Response(text=assistant_response),
+            # )
             text_to_wav(assistant_response, "./temp_storage/")
             # insert_chat_log(table_name, "Chat", assistant_response, idx)
             idx = get_last_index(current_step)
@@ -198,16 +185,18 @@ async def handle_user_message(ctx: Context, sender: str, msg: ContextPrompt):
                 response_message = (
                     f"Received your message for Step {chat_step}: {chat_text}"
                 )
-                await ctx.send(sender, Response(text=response_message))
-
+                # await ctx.send(sender, Response(text=response_message))
+                # sent -> flask server
+                ctx.storage.set("send", response_message)
+                # request
                 logger.info(f"Sent response to {sender}")
 
             except Exception as e:
                 logger.error(f"Error processing request: {e}")
-                await ctx.send(
-                    sender,
-                    Response(text="An error occurred while processing your request."),
-                )
+                # await ctx.send(
+                #     sender,
+                #     Response(text="An error occurred while processing your request."),
+                # )
 
             # Instructions are already parsed; handle user message
             current_step = ctx.storage.get("current_step")
@@ -216,51 +205,48 @@ async def handle_user_message(ctx: Context, sender: str, msg: ContextPrompt):
             logger.info(f"Current step: {current_step}")
             # Confirm and print the user's message
             logger.info(f"Received message from user: {msg.text}")
-            table_name = format_step_name(current_step)
-            # Perform database validation
-            validation_results = query_database_validation(table_name)
-            logger.info(f"Validation Results: {validation_results}")
+            # table_name = format_step_name(current_step)
 
             # Check if any of the judgments say 'Do Not Proceed.'
-            do_not_proceed = False
-            incorrect_description = ""
-            for record in validation_results:
-                step_number, speaker, judgement = record
-                test = judgement.lower().split(".")[1]
+            if ctx.storage.get("request_judgement") is not None:
+                do_not_proceed = False
+                incorrect_description = ""
+                test = ctx.storage.get("request_judgement").lower().split(".")[1]
                 print(test)
                 if "do not proceed" in test:
                     do_not_proceed = True
-                    incorrect_description = judgement
-                    break  # one 'Do Not Proceed.' is enough
+                    incorrect_description = (
+                        ctx.storage.get("request_judgement").lower().split(".")[0]
+                    )
 
-            if do_not_proceed:
-                step_instruction = instruction_list[current_step]
+                if do_not_proceed:
+                    step_instruction = instruction_list[current_step]
 
-                # Craft a prompt to guide the user
-                prompt_text = (
-                    f"The user is making a mistake in the current step.\n\n"
-                    f"Here is the instruction for Step {current_step}: {step_instruction}\n"
-                    f"Here is what they are actually doing: {incorrect_description}\n\n"
-                    f"Please guide them to correct their action based on the instruction."
-                )
+                    # Craft a prompt to guide the user
+                    prompt_text = (
+                        f"The user is making a mistake in the current step.\n\n"
+                        f"Here is the instruction for Step {current_step}: {step_instruction}\n"
+                        f"Here is what they are actually doing: {incorrect_description}\n\n"
+                        f"Please guide them to correct their action based on the instruction."
+                    )
 
-                # Get the assistant's corrective response
-                corrective_response = await get_openai_response(
-                    prompt_context=ctx.storage.get("context", ""),
-                    prompt_text=prompt_text,
-                )
+                    # Get the assistant's corrective response
+                    corrective_response = await get_openai_response(
+                        prompt_context=ctx.storage.get("context", ""),
+                        prompt_text=prompt_text,
+                    )
 
-                # Check if OpenAI returned a valid response
-                if not corrective_response:
-                    corrective_response = "I'm unable to assist with this step at the moment. Please try again later."
+                    # Check if OpenAI returned a valid response
+                    if not corrective_response:
+                        corrective_response = "I'm unable to assist with this step at the moment. Please try again later."
 
-                # Send the corrective response to the user
-                await ctx.send(sender, Response(text=corrective_response))
+                    # Send the corrective response to the user
+                    # await ctx.send(sender, Response(text=corrective_response))
 
-                # Convert text to speech and save
-                text_to_wav(corrective_response, "./temp_storage/")
+                    # Convert text to speech and save
+                    text_to_wav(corrective_response, "./temp_storage/")
 
-                logger.info(f"Provided corrective guidance for Step {current_step}")
+                    logger.info(f"Provided corrective guidance for Step {current_step}")
 
             # Prepare the prompt
             step_instruction = instruction_list[current_step]
@@ -285,12 +271,12 @@ async def handle_user_message(ctx: Context, sender: str, msg: ContextPrompt):
                 # User confirmed completion; move to the next step
                 current_step = increment_step(ctx)
                 if current_step >= len(instruction_list):
-                    await ctx.send(
-                        sender,
-                        Response(
-                            text="The procedure is complete. If you have any questions, feel free to ask."
-                        ),
-                    )
+                    # await ctx.send(
+                    #     sender,
+                    #     Response(
+                    #         text="The procedure is complete. If you have any questions, feel free to ask."
+                    #     ),
+                    # )
                     text_to_wav(
                         "The procedure is complete. If you have any questions, feel free to ask.",
                         "./temp_storage/",
@@ -313,22 +299,22 @@ async def handle_user_message(ctx: Context, sender: str, msg: ContextPrompt):
                         prompt_context=ctx.storage.get("context"),
                         prompt_text=prompt_text,
                     )
-                    await ctx.send(sender, Response(text=assistant_response))
+                    # await ctx.send(sender, Response(text=assistant_response))
                     text_to_wav(assistant_response, "./temp_storage/")
                     idx = get_last_index(current_step)
                     insert_chat_log(f'Step_{current_step}', "Chat", assistant_response, idx + 1)
                     logger.info(f"Moved to next step: Step {current_step}")
             else:
                 text_to_wav(assistant_response, "./temp_storage/")
-                await ctx.send(sender, Response(text=assistant_response))
+                # await ctx.send(sender, Response(text=assistant_response))
                 idx = get_last_index(current_step)
                 insert_chat_log(f'Step_{current_step}', "Chat", assistant_response, idx + 1)
                 logger.info(f"Sent guidance to user on Step {current_step}")
     except Exception as e:
         logger.error(f"Error in assistant agent: {e}")
-        await ctx.send(
-            sender,
-            Response(
-                text="An error occurred while processing your request. Please try again later."
-            ),
-        )
+        # await ctx.send(
+        #     sender,
+        #     Response(
+        #         text="An error occurred while processing your request. Please try again later."
+        #     ),
+        # )

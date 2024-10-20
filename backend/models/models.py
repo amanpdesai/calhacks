@@ -15,8 +15,5 @@ class Request(Model):
     Judgement: str
     User: str
 
-
 class ResponseA(Model):
-    timestamp: int
-    text: str
-    agent_address: str
+    Input: str
