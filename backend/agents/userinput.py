@@ -26,14 +26,14 @@ async def start_conversation(ctx: Context):
         initial_context = system_prompt + user_prompt
         initial_text = catheter_instruction
 
-        # initial message to the assistant agent
+        # Initial message to the assistant agent
         prompt = ContextPrompt(
             context=initial_context,
             text=initial_text,
         )
         await ctx.send(
             "agent1q2h2l2gry8ak32am7x7un5c08kuzggv9szxxpqxwn6ku4lkvtud57lk6c3d", prompt
-        )  # assistant's endpoint
+        )  # Assistant's endpoint
         logger.info("User sent initial message to assistant.")
     except Exception as e:
         logger.error(f"Error in user agent during startup: {e}")
@@ -43,18 +43,17 @@ async def start_conversation(ctx: Context):
 async def handle_response(ctx: Context, sender: str, msg: Response):
     try:
         logger.info(f"User received response from assistant:\n{msg.text}\n")
-        # Simulate user confirmation for each step
-        if "procedure is complete" in msg.text.lower():
-            logger.info("Procedure completed.")
-            return
+        print(f"Assistant Response: {msg.text}\n")
 
-        user_confirmation = "Yes, proceed to the next step."
-        # Send confirmation back to assistant
+        # Ask for user input
+        user_input = input("Enter your response: ")
+
+        # Send the user input as the next message to the assistant
         prompt = ContextPrompt(
-            context="",  # No additional context needed
-            text=user_confirmation,
+            context="",  # No additional context needed for now
+            text=user_input,
         )
         await ctx.send(sender, prompt)
-        logger.info("User sent confirmation to assistant.")
+        logger.info(f"User sent response to assistant: {user_input}")
     except Exception as e:
         logger.error(f"Error in user agent while handling response: {e}")

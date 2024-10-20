@@ -1,5 +1,6 @@
 from utils.config import setup_logging
-from agents.user import user_agent
+# from agents.user import user_agent
+from agents.userinput import user_agent
 
 
 def main():

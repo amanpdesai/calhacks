@@ -1,9 +1,10 @@
-config==0.5.1
-deepgram-sdk==3.7.4
+config==0.5.
+deepgram-sdk
 imgcat==0.5.0
 openai==0.28.0
 pillow==10.4.0
 PyMySQL==1.1.1
-torch==2.5.0
 python-dotenv==1.0.1
-uagents==0.16.2
+uagents
+flask
+cv2
