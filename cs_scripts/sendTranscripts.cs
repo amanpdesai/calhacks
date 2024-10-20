@@ -5,13 +5,13 @@ using UnityEngine.Networking;
 public class TranscriptSender : MonoBehaviour
 {
     [Tooltip("URL of the Flask server endpoint to receive transcripts.")]
-    public string flaskServerURL = "http://127.0.0.1:5000/transcript";
+    public string flaskServerURL = "http://127.0.0.1:5001/transcript";
 
-    private void Awake()
-    {
+    // private void Awake()
+    // {
         // Start the coroutine to send "hello" on Awake
-        StartCoroutine(SendTranscript("hello"));
-    }
+        // StartCoroutine(SendTranscript("hello"));
+    // }
 
     /// <summary>
     /// Coroutine to send a transcript to the Flask server.

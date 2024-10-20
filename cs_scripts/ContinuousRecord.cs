@@ -1,300 +1,3 @@
-// using System.Collections;
-// using System.Collections.Generic;
-// using System.IO;
-// using UnityEngine;
-
-// // for stt
-// using UnityEngine.Networking;
-// using Newtonsoft.Json.Linq; // add to package manager
-// using System;
-// using System.Text;
-// using System.Threading.Tasks;
-
-// public class ContinuousRecord : MonoBehaviour
-// {
-//     private AudioClip recordedClip;
-//     [SerializeField] AudioSource audioSource;
-//     private string deepGramApiKey = "077b7002b19330ce99f96adf7134bf8c50896f78"; //not good practice ik
-
-//     private string directoryPath = "/Users/aj/My project/Recordings";
-//     private float startTime;
-//     private float recordingLength;
-//     private int sampleRate = 44100;
-//     private int lengthSec = 10;
-//     private bool isRecordingContinuous = false;
-//     private Coroutine recordingCoroutine;
-//     private int recordingCounter = 0;
-
-//     // VAD Parameters
-//     [Range(0f, 1f)]
-//     public float silenceThreshold = 0.01f; // Adjust based on testing
-
-//     [Tooltip("Duration (in seconds) of continuous silence to stop recording.")]
-//     public float silenceDurationLimit = 3f;
-
-//     [Tooltip("Interval (in seconds) between silence checks.")]
-//     public float silenceCheckInterval = 0.5f;
-
-
-//     private void Awake()
-//     {
-//         // Use Application.persistentDataPath for platform-independent storage
-//         // directoryPath = Path.Combine(Application.persistentDataPath, "Recordings");
-//         Debug.Log($"Directory Path Set To: {directoryPath}");
-
-//         if (!Directory.Exists(directoryPath))
-//         {
-//             Directory.CreateDirectory(directoryPath);
-//             Debug.Log($"Created directory: {directoryPath}");
-//         }
-//         else
-//         {
-//             Debug.Log($"Directory already exists: {directoryPath}");
-//         }
-
-//         // Initialize recordingCounter based on existing files to prevent filename conflicts
-//         var existingFiles = Directory.GetFiles(directoryPath, "recording_*.wav");
-//         recordingCounter = existingFiles.Length;
-//         Debug.Log($"Initial recordingCounter set to {recordingCounter}");
-//     }
-
-//     /// <summary>
-//     /// Starts the continuous recording process.
-//     /// </summary>
-//     public void StartContinuousRecording()
-//     {
-//         if (Microphone.devices.Length == 0)
-//         {
-//             Debug.LogError("No microphone devices found.");
-//             return;
-//         }
-
-//         if (!isRecordingContinuous)
-//         {
-//             isRecordingContinuous = true;
-//             recordingCoroutine = StartCoroutine(RecordLoop());
-//             Debug.Log("Started continuous recording.");
-//         }
-//         else
-//         {
-//             Debug.LogWarning("Continuous recording is already in progress.");
-//         }
-//     }
-
-//     /// <summary>
-//     /// Stops the continuous recording process.
-//     /// </summary>
-//     public void StopContinuousRecording()
-//     {
-//         if (isRecordingContinuous)
-//         {
-//             isRecordingContinuous = false;
-//             if (recordingCoroutine != null)
-//             {
-//                 StopCoroutine(recordingCoroutine);
-//                 recordingCoroutine = null;
-//             }
-//             Microphone.End(null);
-//             Debug.Log("Stopped continuous recording.");
-//         }
-//         else
-//         {
-//             Debug.LogWarning("Continuous recording is not active.");
-//         }
-//     }
-
-//     /// <summary>
-//     /// Coroutine that handles the continuous recording loop.
-//     /// </summary>
-//     /// <returns></returns>
-//     private IEnumerator RecordLoop()
-//     {
-//         string device = Microphone.devices[0];
-//         Debug.Log($"Using microphone: {device}");
-
-//         while (isRecordingContinuous)
-//         {
-//             // Start Recording
-//             Debug.Log("Attempting to start recording...");
-//             recordedClip = Microphone.Start(device, false, lengthSec, sampleRate);
-//             if (recordedClip == null)
-//             {
-//                 Debug.LogError("Microphone.Start returned null. Recording failed to start.");
-//                 yield break;
-//             }
-//             startTime = Time.realtimeSinceStartup;
-//             Debug.Log("Recording started...");
-
-//             // Wait for the duration of the recording
-//             yield return new WaitForSeconds(lengthSec);
-
-//             // Stop Recording
-//             Microphone.End(null);
-//             recordingLength = Time.realtimeSinceStartup - startTime;
-//             Debug.Log($"Recording stopped. Duration: {recordingLength} seconds.");
-
-//             recordedClip = TrimClip(recordedClip, recordingLength);
-
-//             // Save the recording
-//             // SaveRecording();
-//             TranscribeRecording();
-//         }
-
-//         Debug.Log("Exited recording loop.");
-//     }
-
-//     /// <summary>
-//     /// Saves the recorded AudioClip as a WAV file with a unique name.
-//     /// </summary>
-//     public void SaveRecording()
-//     {
-//         if (recordedClip != null)
-//         {
-//             // Generate a unique filename using a counter and timestamp
-//             string timestamp = System.DateTime.Now.ToString("yyyyMMdd_HHmmss");
-//             string uniqueFileName = $"recording_{timestamp}_{recordingCounter}.wav";
-//             string fullPath = Path.Combine(directoryPath, uniqueFileName);
-
-//             Debug.Log($"Saving recording to: {fullPath}");
-
-//             // Save the AudioClip as a WAV file
-//             WavUtility.Save(fullPath, recordedClip);
-//             Debug.Log($"Recording saved successfully as {uniqueFileName}");
-//             recordingCounter++;
-//         }
-//         else
-//         {
-//             Debug.LogError("No recording found to save.");
-//         }
-//     }
-
-//     /// <summary>
-//     /// Trims the AudioClip to the specified length.
-//     /// </summary>
-//     /// <param name="clip">The original AudioClip.</param>
-//     /// <param name="length">Desired length in seconds.</param>
-//     /// <returns>Trimmed AudioClip.</returns>
-//     private AudioClip TrimClip(AudioClip clip, float length)
-//     {
-//         if (clip == null || length <= 0)
-//         {
-//             Debug.LogError("TrimClip called with null AudioClip or non-positive length.");
-//             return null;
-//         }
-
-//         int samples = Mathf.FloorToInt(clip.frequency * length);
-//         samples = Mathf.Clamp(samples, 0, clip.samples);
-
-//         if (samples <= 0)
-//         {
-//             Debug.LogError("Calculated sample count is non-positive.");
-//             return null;
-//         }
-
-//         float[] data = new float[samples * clip.channels];
-//         bool success = clip.GetData(data, 0);
-//         if (!success)
-//         {
-//             Debug.LogError("Failed to get audio data from clip.");
-//             return null;
-//         }
-
-//         AudioClip trimmedClip = AudioClip.Create(clip.name + "_trimmed", samples, clip.channels, clip.frequency, false);
-//         trimmedClip.SetData(data, 0);
-
-//         Debug.Log("AudioClip trimmed successfully.");
-
-//         return trimmedClip;
-//     }
-
-//     public void TranscribeRecording()
-//     {
-//         if (recordedClip != null)
-//         {
-//             StartCoroutine(TranscribeAudio(recordedClip));
-//         }
-//         else
-//         {
-//             Debug.LogError("No recording found to transcribe.");
-//         }
-//     }
-
-
-//     private IEnumerator TranscribeAudio(AudioClip clip)
-//     {
-//         if (clip == null)
-//         {
-//             Debug.LogError("TranscribeAudio called with null AudioClip.");
-//             yield break;
-//         }
-
-//         if (string.IsNullOrEmpty(deepGramApiKey) || deepGramApiKey == "YOUR_DEEPGRAM_API_KEY")
-//         {
-//             Debug.LogError("DeepGram API Key is not set. Please set it in the Inspector.");
-//             yield break;
-//         }
-
-//         // Convert AudioClip to WAV byte array
-//         byte[] wavData = WavUtility.ToWavBytes(clip);
-//         if (wavData == null || wavData.Length == 0)
-//         {
-//             Debug.LogError("Failed to convert AudioClip to WAV format.");
-//             yield break;
-//         }
-
-//         // Prepare the DeepGram API endpoint with query parameters
-//         string url = "https://api.deepgram.com/v1/listen?model=nova-2&smart_format=true";
-
-//         // Create the UnityWebRequest
-//         UnityWebRequest request = new UnityWebRequest(url, "POST");
-//         request.uploadHandler = new UploadHandlerRaw(wavData);
-//         request.downloadHandler = new DownloadHandlerBuffer();
-
-//         // Set headers
-//         request.SetRequestHeader("Authorization", $"Token {deepGramApiKey}");
-//         request.SetRequestHeader("Content-Type", "audio/wav");
-
-//         Debug.Log($"Sending transcription request to DeepGram: {url}");
-
-//         // Send the request and wait for the response
-//         yield return request.SendWebRequest();
-
-//         // Handle the response
-//         if (request.result == UnityWebRequest.Result.ConnectionError || request.result == UnityWebRequest.Result.ProtocolError)
-//         {
-//             Debug.LogError($"DeepGram transcription failed: {request.error}");
-//         }
-//         else
-//         {
-//             // Parse the JSON response
-//             string jsonResponse = request.downloadHandler.text;
-//             Debug.Log($"DeepGram Response: {jsonResponse}");
-
-//             try
-//             {
-//                 JObject response = JObject.Parse(jsonResponse);
-//                 string transcript = response["results"]?["channels"]?[0]?["alternatives"]?[0]?["transcript"]?.ToString();
-
-//                 if (!string.IsNullOrEmpty(transcript))
-//                 {
-//                     Debug.Log($"Transcription: {transcript}");
-//                     // TODO: Handle the transcription result as needed (e.g., display in UI, send to server)
-//                 }
-//                 else
-//                 {
-//                     Debug.LogWarning("Transcription result is empty.");
-//                 }
-//             }
-//             catch (Exception e)
-//             {
-//                 Debug.LogError($"Failed to parse DeepGram response: {e.Message}");
-//             }
-//         }
-//     }
-
-// }
-
-
 using System;
 using System.Text;
 using System.Threading.Tasks;
@@ -307,11 +10,15 @@ using Newtonsoft.Json.Linq;
 
 public class ContinuousRecord : MonoBehaviour
 {
-    private AudioClip recordedClip;
-    [SerializeField] private AudioSource audioSource;
-    [SerializeField] private string deepGramApiKey = "077b7002b19330ce99f96adf7134bf8c50896f78"; //not good practice ik
+    // [SerializeField] private TranscriptSender transcriptSender;
 
+    private AudioClip recordedClip;
+    [SerializeField] private string deepGramApiKey = "077b7002b19330ce99f96adf7134bf8c50896f78"; //not good practice ik
     private string directoryPath = "/Users/aj/My project/Recordings";
+
+    [Tooltip("URL of the Flask server endpoint to receive transcripts.")]
+    public string flaskServerURL = "http://127.0.0.1:5001/transcript";
+
     private float startTime;
     private float recordingLength;
     private int sampleRate = 44100;
@@ -401,6 +108,7 @@ public class ContinuousRecord : MonoBehaviour
 
     private IEnumerator ListeningLoop()
     {
+        Debug.Log("Listening...");
         // Start microphone in listening mode
         AudioClip listenClip = Microphone.Start(microphoneDevice, true, 120, sampleRate);
         yield return new WaitForSeconds(0.1f); // Wait for mic to initialize
@@ -417,7 +125,7 @@ public class ContinuousRecord : MonoBehaviour
             }
 
             float rms = CalculateRMS(samples);
-            Debug.Log($"Listening RMS: {rms}");
+            // Debug.Log($"Listening RMS: {rms}");
 
             if (rms > speechThreshold)
             {
@@ -453,12 +161,12 @@ public class ContinuousRecord : MonoBehaviour
     /// </summary>
     public void StartContinuousRecording()
     {
-        if (recordingCoroutine!=null)
+        if (recordingCoroutine != null)
         {
             Debug.LogWarning("Continuous recording is already in progress.");
             return;
         }
-        
+
         isRecordingContinuous = true;
         recordingCoroutine = StartCoroutine(RecordLoop());
         Debug.Log("Started continuous recording.");
@@ -537,7 +245,6 @@ public class ContinuousRecord : MonoBehaviour
                 Debug.Log($"Silence detected. Silent Checks: {silentChecks}/{requiredSilentChecks}");
                 if (silentChecks >= requiredSilentChecks)
                 {
-                    // Debug.Log("Silence duration limit exceeded. Stopping recording.");
                     break;
                 }
             }
@@ -651,6 +358,7 @@ public class ContinuousRecord : MonoBehaviour
                 {
                     Debug.Log($"Transcription: {transcript}");
                     // TODO: Handle the transcription result as needed (e.g., display in UI, send to server)
+                    StartCoroutine(SendTranscript(transcript));
                 }
                 else
                 {
@@ -662,6 +370,49 @@ public class ContinuousRecord : MonoBehaviour
                 Debug.LogError($"Failed to parse DeepGram response: {e.Message}");
             }
         }
+    }
+
+    /// <summary>
+    /// Coroutine to send a transcript to the Flask server.
+    /// </summary>
+    /// <param name="transcript">The transcript to send.</param>
+    /// <returns></returns>
+    private IEnumerator SendTranscript(string transcript)
+    {
+        Debug.Log("Sending transcript to server...");
+        // Create a JSON payload
+        string jsonData = JsonUtility.ToJson(new TranscriptPayload { transcript = transcript });
+
+        // Convert the JSON string to a byte array
+        byte[] jsonToSend = new System.Text.UTF8Encoding().GetBytes(jsonData);
+
+        // Create a new UnityWebRequest for POST
+        UnityWebRequest request = new UnityWebRequest(flaskServerURL, "POST");
+        request.uploadHandler = new UploadHandlerRaw(jsonToSend);
+        request.downloadHandler = new DownloadHandlerBuffer();
+        request.SetRequestHeader("Content-Type", "application/json");
+
+        // Send the request and wait for a response
+        yield return request.SendWebRequest();
+
+        // Check for errors
+        if (request.result == UnityWebRequest.Result.ConnectionError || request.result == UnityWebRequest.Result.ProtocolError)
+        {
+            Debug.LogError($"Error sending transcript: {request.error}");
+        }
+        else
+        {
+            Debug.Log("Transcript sent successfully.");
+        }
+    }
+
+    /// <summary>
+    /// Class to structure the JSON payload.
+    /// </summary>
+    [System.Serializable]
+    private class TranscriptPayload
+    {
+        public string transcript;
     }
 
     /// <summary>
